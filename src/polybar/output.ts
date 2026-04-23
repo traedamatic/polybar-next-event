@@ -8,7 +8,8 @@ import { log } from "@/logger";
 // Resolve .env relative to the script location (project root)
 // so it works regardless of polybar's cwd
 const scriptDir = dirname(Bun.main);
-const projectRoot = resolve(scriptDir, "..");
+// dist/polybar/output.js -> up two levels to project root
+const projectRoot = resolve(scriptDir, "../..");
 const envPath = resolve(projectRoot, ".env");
 
 const envFile = Bun.file(envPath);
