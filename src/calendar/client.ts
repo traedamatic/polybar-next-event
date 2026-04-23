@@ -90,5 +90,5 @@ export class CalendarClient {
 }
 
 const formatDateUTC = (date: Date): string => {
-  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return date.toISOString();
 };
