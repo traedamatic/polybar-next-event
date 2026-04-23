@@ -46,18 +46,18 @@ describe("formatForPolybar", () => {
     const longTitle = "This is a very long meeting title that should be truncated";
     const result = formatForPolybar(makeNextEvent({ title: longTitle }));
 
-    // 40 char max: 39 chars + "…"
-    expect(result).toContain("…");
-    // time (5) + space (1) + title (40) = 46 chars inside color tags
+    // 40 char max: 39 chars + ".."
+    expect(result).toContain("..");
+    // time (5) + space (1) + title (41) = 47 chars inside color tags
     const innerText = result.replace(/%\{F[^}]*\}/g, "");
-    expect(innerText.length).toBeLessThanOrEqual(46);
+    expect(innerText.length).toBeLessThanOrEqual(47);
   });
 
   test("does not truncate titles at exactly 40 chars", () => {
     const exactTitle = "A".repeat(40);
     const result = formatForPolybar(makeNextEvent({ title: exactTitle }));
 
-    expect(result).not.toContain("…");
+    expect(result).not.toContain("..");
     expect(result).toContain(exactTitle);
   });
 
@@ -91,6 +91,6 @@ describe("formatForPolybar", () => {
 describe("formatError", () => {
   test("returns error indicator", () => {
     const result = formatError();
-    expect(result).toBe("⚠ Calendar error");
+    expect(result).toBe("CAL ERR");
   });
 });

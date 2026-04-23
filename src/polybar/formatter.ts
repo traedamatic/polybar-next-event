@@ -2,7 +2,7 @@ import type { NextEvent } from "@/event/types";
 
 const MAX_TITLE_LENGTH = 40;
 const NO_EVENTS_TEXT = "No events";
-const ERROR_TEXT = "⚠ Calendar error";
+const ERROR_TEXT = "CAL ERR";
 
 const formatTime = (date: Date): string => {
   const hours = date.getHours().toString().padStart(2, "0");
@@ -12,7 +12,7 @@ const formatTime = (date: Date): string => {
 
 const truncate = (text: string, maxLength: number): string => {
   if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength - 1)}…`;
+  return `${text.slice(0, maxLength - 1)}..`;
 };
 
 export const formatForPolybar = (nextEvent: NextEvent | null): string => {
