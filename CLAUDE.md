@@ -1,23 +1,19 @@
-# Project Name
+# polybar-next-event
 
-Please extend this file with more project related content
+A polybar module that shows the next calendar event with color-coded urgency and a click-to-open detail dialog.
 
 ## GitHub Project
 
-> **Required for `/el-create-ticket` and `/el-dev-loop` commands.**
-> Fill in these values from your GitHub Project (v2) settings.
-> To find the IDs, run: `gh project list --owner <OWNER>` and `gh project field-list <PROJECT_NUMBER> --owner <OWNER>`
-
-- **Owner**: <github-username-or-org>
-- **Repository**: <repo-name>
-- **Project Number**: <number>
-- **Project URL**: https://github.com/users/<owner>/projects/<number>
-- **Project ID**: <project-id>
-- **Status Field ID**: <status-field-id>
+- **Owner**: traedamatic
+- **Repository**: polybar-next-event
+- **Project Number**: 4
+- **Project URL**: https://github.com/users/traedamatic/projects/4
+- **Project ID**: PVT_kwHOAAK5Cs4BVdHK
+- **Status Field ID**: PVTSSF_lAHOAAK5Cs4BVdHKzhQ4zxA
 - **Status Options**:
-  - Todo: `<option-id>`
-  - In Progress: `<option-id>`
-  - Done: `<option-id>`
+  - Todo: `f75ad846`
+  - In Progress: `47fc9ee4`
+  - Done: `98236657`
 
 ## Coding Conventions
 
