@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "test": "bun test",
-    "build": "bun build src/polybar/output.ts --outdir ./dist --target bun"
+    "build": "bun build src/polybar/output.ts src/dialog/show-dialog.ts --outdir ./dist --target bun"
   },
   "license": "MIT",
   "devDependencies": {
