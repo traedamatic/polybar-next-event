@@ -1,5 +1,6 @@
 import { createDAVClient, type DAVCalendar } from "tsdav";
 import type { Config } from "@/config";
+import { log } from "@/logger";
 import { parseICS } from "./parser";
 import type { CalendarEvent, CalendarInfo, FetchOptions } from "./types";
 
@@ -21,16 +22,24 @@ export class CalendarClient {
   }
 
   async fetchEvents(options: FetchOptions): Promise<CalendarEvent[]> {
+    log("Creating CalDAV client...");
     const client = await this.createClient();
+
+    log("Fetching calendars...");
     const calendars = await client.fetchCalendars();
+    log(`Found ${calendars.length} calendar(s): ${calendars.map((c: DAVCalendar) => String(c.displayName || c.url)).join(", ")}`);
 
     if (calendars.length === 0) {
+      log("No calendars found");
       return [];
     }
 
     const allEvents: CalendarEvent[] = [];
 
     for (const calendar of calendars) {
+      const calName = String(calendar.displayName || calendar.url);
+      log(`Fetching events from "${calName}"...`);
+
       const objects = await client.fetchCalendarObjects({
         calendar,
         timeRange: {
@@ -38,14 +47,19 @@ export class CalendarClient {
           end: formatDateUTC(options.timeRangeEnd),
         },
       });
+      log(`Got ${objects.length} calendar object(s) from "${calName}"`);
 
       for (const obj of objects) {
-        if (!obj.data) continue;
+        if (!obj.data) {
+          log(`Skipping object with no data: ${obj.url}`);
+          continue;
+        }
         const events = parseICS(obj.data);
         allEvents.push(...events);
       }
     }
 
+    log(`Total events parsed: ${allEvents.length}`);
     return allEvents.sort(
       (a, b) => a.startTime.getTime() - b.startTime.getTime()
     );
@@ -64,6 +78,9 @@ export class CalendarClient {
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      log(`CalDAV client error: ${message}`);
+      if (stack) log(stack);
 
       if (message.includes("401") || message.includes("Unauthorized")) {
         throw new Error(
