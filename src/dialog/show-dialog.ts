@@ -1,7 +1,37 @@
+import { resolve, dirname } from "node:path";
+import { Webview, SizeHint } from "webview-bun";
 import { loadConfig } from "@/config";
 import { CalendarClient } from "@/calendar/client";
 import { getNextEvent } from "@/event/next-event";
-import { renderEventDetails, renderUpcomingList } from "./renderer";
+import {
+  renderEventDetails,
+  renderUpcomingList,
+  renderDialogHtml,
+  renderErrorHtml,
+} from "./renderer";
+
+// Resolve .env relative to the script location (project root)
+// so it works regardless of polybar's cwd
+const scriptDir = dirname(Bun.main);
+// src/dialog/show-dialog.ts -> up two levels to project root
+const projectRoot = resolve(scriptDir, "../..");
+const envPath = resolve(projectRoot, ".env");
+
+const envFile = Bun.file(envPath);
+if (await envFile.exists()) {
+  const envContent = await envFile.text();
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIndex = trimmed.indexOf("=");
+    if (eqIndex === -1) continue;
+    const key = trimmed.slice(0, eqIndex).trim();
+    const value = trimmed.slice(eqIndex + 1).trim();
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
 
 const PID_FILE = "/tmp/polybar-next-event-dialog.pid";
 
@@ -24,99 +54,18 @@ const killExistingDialog = async (): Promise<void> => {
   }
 };
 
-const showYadDialog = async (
-  detailsHtml: string,
-  upcomingLines: string[]
-): Promise<void> => {
-  const upcomingText = upcomingLines.length > 0
-    ? upcomingLines.join("\n")
-    : "No upcoming events";
-
-  const hasYad = await commandExists("yad");
-
-  if (hasYad) {
-    await showWithYad(detailsHtml, upcomingText);
-  } else {
-    await showWithZenity(detailsHtml, upcomingText);
-  }
-};
-
-const commandExists = async (cmd: string): Promise<boolean> => {
-  try {
-    const proc = Bun.spawn(["which", cmd], { stdout: "pipe", stderr: "pipe" });
-    await proc.exited;
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
-};
-
-const showWithYad = async (details: string, upcoming: string): Promise<void> => {
-  const combinedText = `${details}\n\n<b>━━━ Upcoming Events ━━━</b>\n\n${upcoming}`;
-
-  const proc = Bun.spawn([
-    "yad",
-    "--title=Next Event",
-    "--width=500",
-    "--height=400",
-    "--posx=100",
-    "--posy=30",
-    "--text", combinedText,
-    "--text-info",
-    "--html",
-    "--no-buttons",
-    "--escape-ok",
-    "--undecorated",
-  ], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  await Bun.write(PID_FILE, String(proc.pid));
-  await proc.exited;
-
-  try {
-    await Bun.write(PID_FILE, "");
-  } catch {
-    // Cleanup best effort
-  }
-};
-
-const showWithZenity = async (details: string, upcoming: string): Promise<void> => {
-  const plainText = `${details}\n\n── Upcoming Events ──\n\n${upcoming}`
-    .replace(/<b>/g, "")
-    .replace(/<\/b>/g, "")
-    .replace(/<span[^>]*>/g, "")
-    .replace(/<\/span>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
-
-  const proc = Bun.spawn([
-    "zenity",
-    "--info",
-    "--title=Next Event",
-    "--width=500",
-    "--height=400",
-    "--text", plainText,
-    "--no-wrap",
-  ], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  await Bun.write(PID_FILE, String(proc.pid));
-  await proc.exited;
-
-  try {
-    await Bun.write(PID_FILE, "");
-  } catch {
-    // Cleanup best effort
-  }
+const showDialog = (html: string): void => {
+  const webview = new Webview();
+  webview.title = "Next Event";
+  webview.size = { width: 500, height: 400, hint: SizeHint.FIXED };
+  webview.setHTML(html);
+  webview.run();
+  webview.destroy();
 };
 
 const run = async (): Promise<void> => {
   await killExistingDialog();
+  await Bun.write(PID_FILE, String(process.pid));
 
   try {
     const config = loadConfig();
@@ -134,25 +83,20 @@ const run = async (): Promise<void> => {
 
     const detailsHtml = nextEvent
       ? renderEventDetails(nextEvent.event)
-      : "<b>No upcoming events</b>";
+      : `<h2>No upcoming events</h2>`;
 
     const upcomingLines = renderUpcomingList(events, now, config);
+    const html = renderDialogHtml(detailsHtml, upcomingLines);
 
-    await showYadDialog(detailsHtml, upcomingLines);
+    showDialog(html);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-
-    const hasZenity = await commandExists("zenity");
-    if (hasZenity) {
-      const proc = Bun.spawn([
-        "zenity",
-        "--error",
-        "--title=Calendar Error",
-        "--text", `Failed to load calendar:\n${message}`,
-      ], { stdout: "pipe", stderr: "pipe" });
-      await proc.exited;
-    } else {
-      console.error(`Calendar error: ${message}`);
+    showDialog(renderErrorHtml(message));
+  } finally {
+    try {
+      await Bun.write(PID_FILE, "");
+    } catch {
+      // Cleanup best effort
     }
   }
 };

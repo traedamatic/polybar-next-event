@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { renderEventDetails, renderUpcomingList } from "@/dialog/renderer";
+import {
+  renderEventDetails,
+  renderUpcomingList,
+  renderDialogHtml,
+  renderErrorHtml,
+  escapeHtml,
+} from "@/dialog/renderer";
 import type { CalendarEvent } from "@/calendar/types";
 import type { Config } from "@/config";
 
@@ -21,9 +27,9 @@ const makeEvent = (overrides: Partial<CalendarEvent>): CalendarEvent => ({
 });
 
 describe("renderEventDetails", () => {
-  test("renders event title in bold", () => {
+  test("renders event title as heading", () => {
     const result = renderEventDetails(makeEvent({ title: "Team Standup" }));
-    expect(result).toContain("<b>Team Standup</b>");
+    expect(result).toContain("<h2>Team Standup</h2>");
   });
 
   test("renders time range for same-day event", () => {
@@ -56,9 +62,7 @@ describe("renderEventDetails", () => {
 
   test("omits description when absent", () => {
     const result = renderEventDetails(makeEvent({ description: undefined }));
-    const lines = result.split("\n").filter((l) => l.trim().length > 0);
-    // Should only have title + time
-    expect(lines.length).toBeLessThanOrEqual(3);
+    expect(result).not.toContain("description");
   });
 
   test("renders attendees when present", () => {
@@ -90,6 +94,15 @@ describe("renderUpcomingList", () => {
     expect(result[0]).toContain("14:00");
     expect(result[0]).toContain("Event 1");
     expect(result[1]).toContain("16:00");
+  });
+
+  test("uses inline color style", () => {
+    const events = [
+      makeEvent({ uid: "1", title: "Event 1", startTime: new Date("2026-04-23T14:00:00") }),
+    ];
+
+    const result = renderUpcomingList(events, NOW, DEFAULT_CONFIG);
+    expect(result[0]).toContain('style="color:');
   });
 
   test("limits to maxItems", () => {
@@ -132,5 +145,52 @@ describe("renderUpcomingList", () => {
 
     const result = renderUpcomingList(events, NOW, DEFAULT_CONFIG);
     expect(result[0]).toContain("…");
+  });
+});
+
+describe("renderDialogHtml", () => {
+  test("wraps content in full HTML document", () => {
+    const result = renderDialogHtml("<h2>Test</h2>", []);
+    expect(result).toContain("<!DOCTYPE html>");
+    expect(result).toContain("<style>");
+    expect(result).toContain("<h2>Test</h2>");
+  });
+
+  test("includes upcoming events section", () => {
+    const upcoming = [
+      `<div class="upcoming-item"><span style="color: #A3BE8C">14:00</span> Meeting</div>`,
+    ];
+    const result = renderDialogHtml("<h2>Test</h2>", upcoming);
+    expect(result).toContain("Upcoming Events");
+    expect(result).toContain("14:00");
+    expect(result).toContain("Meeting");
+  });
+
+  test("shows empty message when no upcoming events", () => {
+    const result = renderDialogHtml("<h2>Test</h2>", []);
+    expect(result).toContain("No upcoming events");
+  });
+});
+
+describe("renderErrorHtml", () => {
+  test("renders error message", () => {
+    const result = renderErrorHtml("Connection failed");
+    expect(result).toContain("Calendar Error");
+    expect(result).toContain("Connection failed");
+  });
+
+  test("escapes HTML in error message", () => {
+    const result = renderErrorHtml("Error: <timeout>");
+    expect(result).toContain("&lt;timeout&gt;");
+  });
+});
+
+describe("escapeHtml", () => {
+  test("escapes ampersands", () => {
+    expect(escapeHtml("A&B")).toBe("A&amp;B");
+  });
+
+  test("escapes angle brackets", () => {
+    expect(escapeHtml("<b>")).toBe("&lt;b&gt;");
   });
 });
