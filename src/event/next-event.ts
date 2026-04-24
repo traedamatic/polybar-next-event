@@ -1,5 +1,6 @@
 import type { CalendarEvent } from "@/calendar/types";
 import type { Config } from "@/config";
+import { log } from "@/logger";
 import type { NextEvent, UrgencyLevel } from "./types";
 
 const URGENT_THRESHOLD_MINUTES = 15;
@@ -12,9 +13,17 @@ export const getNextEvent = (
 ): NextEvent | null => {
   const nowMs = now.getTime();
 
+  log(`getNextEvent: ${events.length} total events, now=${now.toISOString()}`);
+  for (const e of events) {
+    const delta = Math.round((e.startTime.getTime() - nowMs) / 60000);
+    log(`  "${e.title}" start=${e.startTime.toISOString()} allDay=${e.isAllDay} delta=${delta}min`);
+  }
+
   const upcoming = events
     .filter((e) => !e.isAllDay && e.startTime.getTime() > nowMs)
     .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+  log(`getNextEvent: ${upcoming.length} upcoming after filter`);
 
   if (upcoming.length === 0) return null;
 

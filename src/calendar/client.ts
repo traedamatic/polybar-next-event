@@ -34,9 +34,19 @@ export class CalendarClient {
       return [];
     }
 
+    const filter = this.config.calendar.calendarFilter;
+    const filteredCalendars = filter.length > 0
+      ? calendars.filter((c: DAVCalendar) => {
+          const name = String(c.displayName || c.url);
+          const included = filter.includes(name);
+          if (!included) log(`Skipping calendar "${name}" (not in CALENDAR_FILTER)`);
+          return included;
+        })
+      : calendars;
+
     const allEvents: CalendarEvent[] = [];
 
-    for (const calendar of calendars) {
+    for (const calendar of filteredCalendars) {
       const calName = String(calendar.displayName || calendar.url);
       log(`Fetching events from "${calName}"...`);
 
@@ -54,7 +64,10 @@ export class CalendarClient {
           log(`Skipping object with no data: ${obj.url}`);
           continue;
         }
-        const events = parseICS(obj.data);
+        const events = parseICS(obj.data, {
+          start: options.timeRangeStart,
+          end: options.timeRangeEnd,
+        });
         allEvents.push(...events);
       }
     }

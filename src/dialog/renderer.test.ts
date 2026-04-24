@@ -10,7 +10,7 @@ import type { CalendarEvent } from "@/calendar/types";
 import type { Config } from "@/config";
 
 const DEFAULT_CONFIG: Config = {
-  calendar: { url: "", username: "", password: "" },
+  calendar: { url: "", username: "", password: "", calendarFilter: [] },
   polling: { intervalSeconds: 60 },
   colors: { far: "#A3BE8C", medium: "#EBCB8B", urgent: "#BF616A" },
 };

@@ -12,6 +12,7 @@ const saveEnv = (): Record<string, string | undefined> => {
   const keys = [
     "CALENDAR_URL", "CALENDAR_USERNAME", "CALENDAR_PASSWORD",
     "POLL_INTERVAL", "COLOR_FAR", "COLOR_MEDIUM", "COLOR_URGENT",
+    "CALENDAR_FILTER",
   ];
   for (const key of keys) {
     saved[key] = process.env[key];
@@ -37,6 +38,7 @@ const clearEnv = (): void => {
   delete process.env.COLOR_FAR;
   delete process.env.COLOR_MEDIUM;
   delete process.env.COLOR_URGENT;
+  delete process.env.CALENDAR_FILTER;
 };
 
 describe("loadConfig", () => {
@@ -157,5 +159,59 @@ describe("loadConfig", () => {
     expect(config.colors.far).toBe("#A3BE8C");
     expect(config.colors.medium).toBe("#EBCB8B");
     expect(config.colors.urgent).toBe("#BF616A");
+  });
+
+  test("returns empty calendarFilter when CALENDAR_FILTER is unset", () => {
+    Object.assign(process.env, REQUIRED_ENV);
+
+    const config = loadConfig();
+
+    expect(config.calendar.calendarFilter).toEqual([]);
+  });
+
+  test("parses comma-separated CALENDAR_FILTER", () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    process.env.CALENDAR_FILTER = "Persönlich,Tredis (Fam Cal),Nicolas@konek.to";
+
+    const config = loadConfig();
+
+    expect(config.calendar.calendarFilter).toEqual([
+      "Persönlich",
+      "Tredis (Fam Cal)",
+      "Nicolas@konek.to",
+    ]);
+  });
+
+  test("trims whitespace around calendar filter names", () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    process.env.CALENDAR_FILTER = " Persönlich , Tredis (Fam Cal) ";
+
+    const config = loadConfig();
+
+    expect(config.calendar.calendarFilter).toEqual([
+      "Persönlich",
+      "Tredis (Fam Cal)",
+    ]);
+  });
+
+  test("ignores trailing commas and empty segments in CALENDAR_FILTER", () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    process.env.CALENDAR_FILTER = "Persönlich,,Tredis (Fam Cal),";
+
+    const config = loadConfig();
+
+    expect(config.calendar.calendarFilter).toEqual([
+      "Persönlich",
+      "Tredis (Fam Cal)",
+    ]);
+  });
+
+  test("returns empty calendarFilter for empty CALENDAR_FILTER string", () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    process.env.CALENDAR_FILTER = "";
+
+    const config = loadConfig();
+
+    expect(config.calendar.calendarFilter).toEqual([]);
   });
 });

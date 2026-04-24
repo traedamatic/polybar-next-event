@@ -4,7 +4,7 @@ import type { CalendarEvent } from "@/calendar/types";
 import type { Config } from "@/config";
 
 const DEFAULT_CONFIG: Config = {
-  calendar: { url: "", username: "", password: "" },
+  calendar: { url: "", username: "", password: "", calendarFilter: [] },
   polling: { intervalSeconds: 60 },
   colors: { far: "#A3BE8C", medium: "#EBCB8B", urgent: "#BF616A" },
 };
@@ -198,5 +198,88 @@ describe("getNextEvent", () => {
     const result = getNextEvent(events, NOW, DEFAULT_CONFIG);
 
     expect(result!.urgency).toBe("far");
+  });
+});
+
+describe("getNextEvent with recurring event scenarios", () => {
+  // Simulates the real bug: recurring work event at 10:00 Berlin (08:00 UTC)
+  // vs one-time family event at 19:00 Berlin (17:00 UTC)
+  // now = 07:30 UTC (09:30 Berlin)
+  const MORNING_NOW = new Date("2026-04-24T07:30:00Z");
+
+  test("selects earlier work event over later family event", () => {
+    const events = [
+      makeEvent({
+        uid: "family-1",
+        title: "Aleks aus",
+        startTime: new Date("2026-04-24T17:00:00Z"), // 19:00 Berlin
+        endTime: new Date("2026-04-24T18:00:00Z"),
+      }),
+      makeEvent({
+        uid: "work-1",
+        title: "Daily Standup",
+        startTime: new Date("2026-04-24T08:00:00Z"), // 10:00 Berlin
+        endTime: new Date("2026-04-24T08:30:00Z"),
+      }),
+    ];
+
+    const result = getNextEvent(events, MORNING_NOW, DEFAULT_CONFIG);
+
+    expect(result).not.toBeNull();
+    expect(result!.event.title).toBe("Daily Standup");
+    expect(result!.event.startTime).toEqual(new Date("2026-04-24T08:00:00Z"));
+  });
+
+  test("selects earliest among multiple recurring event occurrences", () => {
+    const events = [
+      makeEvent({
+        uid: "late-meeting",
+        title: "Afternoon Sync",
+        startTime: new Date("2026-04-24T14:00:00Z"), // 16:00 Berlin
+        endTime: new Date("2026-04-24T15:00:00Z"),
+      }),
+      makeEvent({
+        uid: "early-meeting",
+        title: "Morning Standup",
+        startTime: new Date("2026-04-24T08:00:00Z"), // 10:00 Berlin
+        endTime: new Date("2026-04-24T08:30:00Z"),
+      }),
+      makeEvent({
+        uid: "mid-meeting",
+        title: "Lunch Review",
+        startTime: new Date("2026-04-24T10:00:00Z"), // 12:00 Berlin
+        endTime: new Date("2026-04-24T11:00:00Z"),
+      }),
+    ];
+
+    const result = getNextEvent(events, MORNING_NOW, DEFAULT_CONFIG);
+
+    expect(result).not.toBeNull();
+    expect(result!.event.title).toBe("Morning Standup");
+  });
+
+  test("skips recurring event occurrence that is in the past", () => {
+    // now = 09:00 UTC, work event was at 08:00 UTC (already started)
+    const laterNow = new Date("2026-04-24T09:00:00Z");
+
+    const events = [
+      makeEvent({
+        uid: "past-work",
+        title: "Daily Standup",
+        startTime: new Date("2026-04-24T08:00:00Z"),
+        endTime: new Date("2026-04-24T08:30:00Z"),
+      }),
+      makeEvent({
+        uid: "family-1",
+        title: "Aleks aus",
+        startTime: new Date("2026-04-24T17:00:00Z"),
+        endTime: new Date("2026-04-24T18:00:00Z"),
+      }),
+    ];
+
+    const result = getNextEvent(events, laterNow, DEFAULT_CONFIG);
+
+    expect(result).not.toBeNull();
+    expect(result!.event.title).toBe("Aleks aus");
   });
 });
