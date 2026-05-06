@@ -35,7 +35,7 @@ const killExistingDialog = async (): Promise<void> => {
 
 const showDialog = (html: string): void => {
   const webview = new Webview();
-  webview.title = "Next Event";
+  webview.title = "Polybar - Next Event";
   webview.size = { width: 500, height: 400, hint: SizeHint.FIXED };
   webview.setHTML(html);
   webview.run();
