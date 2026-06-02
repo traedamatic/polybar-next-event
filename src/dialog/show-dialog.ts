@@ -1,7 +1,7 @@
 import { Webview, SizeHint } from "webview-bun";
 import { loadConfig } from "@/config";
 import { loadEnv } from "@/env";
-import { CalendarClient } from "@/calendar/client";
+import { fetchAllEvents } from "@/calendar/client";
 import { getNextEvent } from "@/event/next-event";
 import {
   renderEventDetails,
@@ -48,12 +48,11 @@ const run = async (): Promise<void> => {
 
   try {
     const config = loadConfig();
-    const client = new CalendarClient(config);
 
     const now = new Date();
     const endOfWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    const events = await client.fetchEvents({
+    const events = await fetchAllEvents(config.calendars, {
       timeRangeStart: now,
       timeRangeEnd: endOfWindow,
     });

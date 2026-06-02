@@ -1,6 +1,6 @@
 import { loadConfig } from "@/config";
 import { loadEnv } from "@/env";
-import { CalendarClient } from "@/calendar/client";
+import { fetchAllEvents } from "@/calendar/client";
 import { getNextEvent } from "@/event/next-event";
 import { formatForPolybar, formatError } from "./formatter";
 import { log } from "@/logger";
@@ -11,12 +11,12 @@ const run = async (): Promise<void> => {
   try {
     log("--- polybar-next-event started ---");
     const config = loadConfig();
-    log(
-      `Config loaded: url=${config.calendar.url}, user=${config.calendar.username}`,
-    );
-    log(`Calender Filter: ${config.calendar.calendarFilter}`);
-
-    const client = new CalendarClient(config);
+    log(`Config loaded: ${config.calendars.length} calendar account(s)`);
+    config.calendars.forEach((account, index) => {
+      log(
+        `  Account ${index + 1}: url=${account.url}, user=${account.username}, filter=[${account.calendarFilter.join(", ")}]`,
+      );
+    });
 
     const now = new Date();
     const endOfWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -24,7 +24,7 @@ const run = async (): Promise<void> => {
       `Fetching events from ${now.toISOString()} to ${endOfWindow.toISOString()}`,
     );
 
-    const events = await client.fetchEvents({
+    const events = await fetchAllEvents(config.calendars, {
       timeRangeStart: now,
       timeRangeEnd: endOfWindow,
     });

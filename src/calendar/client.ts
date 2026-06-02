@@ -1,14 +1,14 @@
 import { createDAVClient, type DAVCalendar } from "tsdav";
-import type { Config } from "@/config";
+import type { CalendarAccount } from "@/config";
 import { log } from "@/logger";
 import { parseICS } from "./parser";
 import type { CalendarEvent, CalendarInfo, FetchOptions } from "./types";
 
 export class CalendarClient {
-  private config: Config;
+  private account: CalendarAccount;
 
-  constructor(config: Config) {
-    this.config = config;
+  constructor(account: CalendarAccount) {
+    this.account = account;
   }
 
   async fetchCalendars(): Promise<CalendarInfo[]> {
@@ -34,7 +34,7 @@ export class CalendarClient {
       return [];
     }
 
-    const filter = this.config.calendar.calendarFilter;
+    const filter = this.account.calendarFilter;
     const filteredCalendars = filter.length > 0
       ? calendars.filter((c: DAVCalendar) => {
           const name = String(c.displayName || c.url);
@@ -81,10 +81,10 @@ export class CalendarClient {
   private async createClient() {
     try {
       return await createDAVClient({
-        serverUrl: this.config.calendar.url,
+        serverUrl: this.account.url,
         credentials: {
-          username: this.config.calendar.username,
-          password: this.config.calendar.password,
+          username: this.account.username,
+          password: this.account.password,
         },
         authMethod: "Basic",
         defaultAccountType: "caldav",
@@ -104,13 +104,13 @@ export class CalendarClient {
 
       if (message.includes("ENOTFOUND") || message.includes("ECONNREFUSED")) {
         throw new Error(
-          `Cannot reach calendar server at ${this.config.calendar.url}. Check your CALENDAR_URL.`
+          `Cannot reach calendar server at ${this.account.url}. Check your CALENDAR_URL.`
         );
       }
 
       if (message.includes("timeout") || message.includes("ETIMEDOUT")) {
         throw new Error(
-          `Calendar server timed out at ${this.config.calendar.url}. Try again later.`
+          `Calendar server timed out at ${this.account.url}. Try again later.`
         );
       }
 
@@ -121,4 +121,34 @@ export class CalendarClient {
 
 const formatDateUTC = (date: Date): string => {
   return date.toISOString();
+};
+
+/**
+ * Fetches events from every configured account and merges them into a single
+ * time-sorted list. Uses Promise.allSettled so that one failing account (e.g. a
+ * bad password) does not blank out events from the others.
+ */
+export const fetchAllEvents = async (
+  accounts: CalendarAccount[],
+  options: FetchOptions,
+): Promise<CalendarEvent[]> => {
+  const results = await Promise.allSettled(
+    accounts.map((account) => new CalendarClient(account).fetchEvents(options)),
+  );
+
+  const events: CalendarEvent[] = [];
+  results.forEach((result, index) => {
+    const account = accounts[index]!;
+    if (result.status === "fulfilled") {
+      events.push(...result.value);
+    } else {
+      const reason =
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+      log(`Account ${index + 1} (${account.url}) failed: ${reason}`);
+    }
+  });
+
+  return events.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 };

@@ -7,38 +7,34 @@ const REQUIRED_ENV = {
   CALENDAR_PASSWORD: "test-app-password",
 };
 
+// Any CALENDAR_* env key (numbered or legacy) plus the shared option keys.
+const calendarKeys = (): string[] =>
+  Object.keys(process.env).filter((key) => key.startsWith("CALENDAR_"));
+
+const OPTION_KEYS = ["POLL_INTERVAL", "COLOR_FAR", "COLOR_MEDIUM", "COLOR_URGENT"];
+
 const saveEnv = (): Record<string, string | undefined> => {
   const saved: Record<string, string | undefined> = {};
-  const keys = [
-    "CALENDAR_URL", "CALENDAR_USERNAME", "CALENDAR_PASSWORD",
-    "POLL_INTERVAL", "COLOR_FAR", "COLOR_MEDIUM", "COLOR_URGENT",
-    "CALENDAR_FILTER",
-  ];
-  for (const key of keys) {
+  for (const key of [...calendarKeys(), ...OPTION_KEYS]) {
     saved[key] = process.env[key];
   }
   return saved;
 };
 
 const restoreEnv = (saved: Record<string, string | undefined>): void => {
+  // Clear anything set during the test, then restore the snapshot.
+  clearEnv();
   for (const [key, value] of Object.entries(saved)) {
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
+    if (value !== undefined) {
       process.env[key] = value;
     }
   }
 };
 
 const clearEnv = (): void => {
-  delete process.env.CALENDAR_URL;
-  delete process.env.CALENDAR_USERNAME;
-  delete process.env.CALENDAR_PASSWORD;
-  delete process.env.POLL_INTERVAL;
-  delete process.env.COLOR_FAR;
-  delete process.env.COLOR_MEDIUM;
-  delete process.env.COLOR_URGENT;
-  delete process.env.CALENDAR_FILTER;
+  for (const key of [...calendarKeys(), ...OPTION_KEYS]) {
+    delete process.env[key];
+  }
 };
 
 describe("loadConfig", () => {
@@ -58,9 +54,10 @@ describe("loadConfig", () => {
 
     const config = loadConfig();
 
-    expect(config.calendar.url).toBe(REQUIRED_ENV.CALENDAR_URL);
-    expect(config.calendar.username).toBe(REQUIRED_ENV.CALENDAR_USERNAME);
-    expect(config.calendar.password).toBe(REQUIRED_ENV.CALENDAR_PASSWORD);
+    expect(config.calendars).toHaveLength(1);
+    expect(config.calendars[0]!.url).toBe(REQUIRED_ENV.CALENDAR_URL);
+    expect(config.calendars[0]!.username).toBe(REQUIRED_ENV.CALENDAR_USERNAME);
+    expect(config.calendars[0]!.password).toBe(REQUIRED_ENV.CALENDAR_PASSWORD);
   });
 
   test("throws when CALENDAR_URL is missing", () => {
@@ -84,10 +81,8 @@ describe("loadConfig", () => {
     expect(() => loadConfig()).toThrow("CALENDAR_PASSWORD");
   });
 
-  test("throws listing all missing vars at once", () => {
-    expect(() => loadConfig()).toThrow(
-      "Missing required environment variables: CALENDAR_URL, CALENDAR_USERNAME, CALENDAR_PASSWORD"
-    );
+  test("throws when no calendar is configured at all", () => {
+    expect(() => loadConfig()).toThrow("No calendar configured");
   });
 
   test("uses default polling interval of 60s", () => {
@@ -166,7 +161,7 @@ describe("loadConfig", () => {
 
     const config = loadConfig();
 
-    expect(config.calendar.calendarFilter).toEqual([]);
+    expect(config.calendars[0]!.calendarFilter).toEqual([]);
   });
 
   test("parses comma-separated CALENDAR_FILTER", () => {
@@ -175,7 +170,7 @@ describe("loadConfig", () => {
 
     const config = loadConfig();
 
-    expect(config.calendar.calendarFilter).toEqual([
+    expect(config.calendars[0]!.calendarFilter).toEqual([
       "Persönlich",
       "Tredis (Fam Cal)",
       "Nicolas@konek.to",
@@ -188,7 +183,7 @@ describe("loadConfig", () => {
 
     const config = loadConfig();
 
-    expect(config.calendar.calendarFilter).toEqual([
+    expect(config.calendars[0]!.calendarFilter).toEqual([
       "Persönlich",
       "Tredis (Fam Cal)",
     ]);
@@ -200,7 +195,7 @@ describe("loadConfig", () => {
 
     const config = loadConfig();
 
-    expect(config.calendar.calendarFilter).toEqual([
+    expect(config.calendars[0]!.calendarFilter).toEqual([
       "Persönlich",
       "Tredis (Fam Cal)",
     ]);
@@ -212,6 +207,58 @@ describe("loadConfig", () => {
 
     const config = loadConfig();
 
-    expect(config.calendar.calendarFilter).toEqual([]);
+    expect(config.calendars[0]!.calendarFilter).toEqual([]);
+  });
+
+  test("parses multiple numbered accounts in ascending index order", () => {
+    process.env.CALENDAR_1_URL = "https://caldav.fastmail.com/private/";
+    process.env.CALENDAR_1_USERNAME = "private@fastmail.com";
+    process.env.CALENDAR_1_PASSWORD = "private-pw";
+    process.env.CALENDAR_2_URL = "https://caldav.fastmail.com/work/";
+    process.env.CALENDAR_2_USERNAME = "work@fastmail.com";
+    process.env.CALENDAR_2_PASSWORD = "work-pw";
+
+    const config = loadConfig();
+
+    expect(config.calendars).toHaveLength(2);
+    expect(config.calendars[0]!.username).toBe("private@fastmail.com");
+    expect(config.calendars[1]!.username).toBe("work@fastmail.com");
+  });
+
+  test("parses per-account CALENDAR_N_FILTER independently", () => {
+    process.env.CALENDAR_1_URL = "https://caldav.fastmail.com/private/";
+    process.env.CALENDAR_1_USERNAME = "private@fastmail.com";
+    process.env.CALENDAR_1_PASSWORD = "private-pw";
+    process.env.CALENDAR_1_FILTER = "Persönlich";
+    process.env.CALENDAR_2_URL = "https://caldav.fastmail.com/work/";
+    process.env.CALENDAR_2_USERNAME = "work@fastmail.com";
+    process.env.CALENDAR_2_PASSWORD = "work-pw";
+    process.env.CALENDAR_2_FILTER = "Work, Team Cal";
+
+    const config = loadConfig();
+
+    expect(config.calendars[0]!.calendarFilter).toEqual(["Persönlich"]);
+    expect(config.calendars[1]!.calendarFilter).toEqual(["Work", "Team Cal"]);
+  });
+
+  test("appends a legacy unnumbered account after numbered accounts", () => {
+    process.env.CALENDAR_1_URL = "https://caldav.fastmail.com/work/";
+    process.env.CALENDAR_1_USERNAME = "work@fastmail.com";
+    process.env.CALENDAR_1_PASSWORD = "work-pw";
+    Object.assign(process.env, REQUIRED_ENV);
+
+    const config = loadConfig();
+
+    expect(config.calendars).toHaveLength(2);
+    expect(config.calendars[0]!.username).toBe("work@fastmail.com");
+    expect(config.calendars[1]!.url).toBe(REQUIRED_ENV.CALENDAR_URL);
+  });
+
+  test("throws naming the exact missing key for a numbered account", () => {
+    process.env.CALENDAR_2_URL = "https://caldav.fastmail.com/work/";
+    process.env.CALENDAR_2_USERNAME = "work@fastmail.com";
+    // CALENDAR_2_PASSWORD intentionally omitted
+
+    expect(() => loadConfig()).toThrow("CALENDAR_2_PASSWORD");
   });
 });

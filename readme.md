@@ -70,6 +70,28 @@ CALENDAR_USERNAME=you@fastmail.com
 CALENDAR_PASSWORD=your-app-password-here
 ```
 
+### Multiple calendars
+
+To show events from several accounts (e.g. a private and a business Fastmail
+account), use numbered variables instead. Events from all accounts are merged
+and sorted into a single list; if one account fails (e.g. a wrong password) the
+others still show.
+
+```env
+CALENDAR_1_URL=https://caldav.fastmail.com/dav/principals/user/private@fastmail.com/
+CALENDAR_1_USERNAME=private@fastmail.com
+CALENDAR_1_PASSWORD=private-app-password
+CALENDAR_1_FILTER=Persönlich          # optional, per account
+
+CALENDAR_2_URL=https://caldav.fastmail.com/dav/principals/user/work@fastmail.com/
+CALENDAR_2_USERNAME=work@fastmail.com
+CALENDAR_2_PASSWORD=work-app-password
+CALENDAR_2_FILTER=Work,Team Cal
+```
+
+The unnumbered `CALENDAR_*` variables still work for a single account, and if
+set are added as one more account alongside any numbered ones.
+
 Optional settings:
 
 ```env
@@ -77,6 +99,7 @@ POLL_INTERVAL=60         # polling interval in seconds (default: 60)
 COLOR_FAR=#A3BE8C        # > 1 hour away (default: green)
 COLOR_MEDIUM=#EBCB8B     # 15-60 min away (default: yellow)
 COLOR_URGENT=#BF616A     # < 15 min away (default: red)
+CALENDAR_FILTER=...      # comma-separated calendar names (single-account form)
 ```
 
 ## Development
